@@ -13,8 +13,9 @@ axios.get(input)
 
 function performA(data)
 {
-    let program = data.split('\n').map( x => x.split(' '));
-    // console.log(program);
+    let programOriginal = data.split('\n').map( x => x.split(' '));
+    console.log(programOriginal);
+    let program = programOriginal.map(object => ({ ...object }));
 
     let index = 0;
     let programRunning = true;
@@ -23,14 +24,10 @@ function performA(data)
     let safety = 0;
     let totalSafety = 0;
     let executedCommands = new Map();
+    let correctedIdx = Array();
 
-    while(programRunning && totalSafety < 25)
+    while(programRunning && totalSafety < 1000)
     {
-        safety = 0;
-        index = 0;
-        lastCommand = "";
-        lastIndex = 0;
-
         while(index >= 0 && index < program.length && programRunning && safety < 1000)
         {
             if (!executedCommands.get(index))
@@ -60,13 +57,15 @@ function performA(data)
                     default:
                         break;
                 }
+
                 safety++;
 
-                let debugLine = safety+" : "+command+" ("+value+") > ACC: "+acc+" > IDX: "+index;
-                console.log(debugLine);
+                // let debugLine = safety+" : "+command+" ("+value+") > ACC: "+acc+" > IDX: "+index;
+                // console.log(debugLine);
             }
             else
             {
+                console.log('break inner while: '+totalSafety);
                 programRunning = false;
             }
         }
@@ -75,24 +74,63 @@ function performA(data)
 
         if (programRunning)
         {
+            console.log('program ended correct: '+totalSafety);
             programRunning = false;
         }
         else
         {
-            console.log("Need to change: "+lastCommand+" > "+lastIndex);
-            programRunning = true;
-            if (lastCommand === "jmp")
+            console.log('trace error code');
+            // console.log(executedCommands);
+            let executed = executedCommands.keys();
+            let command = executed.next();
+            let found = false;
+
+            while(!command.done && !found)
             {
-                program[lastIndex] = "nop";
+                let correctingIdx = command.value;
+                if(program[correctingIdx][0] === 'jmp' || program[correctingIdx][0] === 'nop')
+                {
+                    if(correctedIdx.indexOf(correctingIdx) < 0)
+                    {
+                        console.log('change portion @ '+correctingIdx);
+                        correctedIdx.push(correctingIdx);
+                        program = programOriginal.map(object => ({ ...object }));
+                        found = true;
+                        programRunning = true;
+                        acc = 0;
+                        safety = 0;
+                        index = 0;
+                        executedCommands = new Map();
+                        if(program[correctingIdx][0] === 'jmp')
+                        {
+                            program[correctingIdx][0] = 'nop';
+                        }
+                        else
+                        {
+                            program[correctingIdx][0] = 'jmp';
+                        }
+                    }
+                }
+                command = executed.next();
             }
-            else
+
+            if (!found)
             {
-                program[lastIndex] = "jmp";
+                console.log('reset program');
+                program = programOriginal.map(object => ({ ...object }));
+                found = true;
+                programRunning = true;
+                acc = 0;
+                safety = 0;
+                index = 0;
+                executedCommands = new Map();
             }
+            console.log(correctedIdx);
         }
     }
 
     console.log(programRunning+" - "+totalSafety+" ["+safety+"]");
     console.log(program);
+    console.log(programOriginal);
     console.log('Stopped with acc @ '+acc);
 }
